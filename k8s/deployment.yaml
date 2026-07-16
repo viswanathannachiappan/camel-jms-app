@@ -1,0 +1,46 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: camel-jms-app
+  namespace: locked-down-broker
+  labels:
+    app: camel-jms-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: camel-jms-app
+  template:
+    metadata:
+      labels:
+        app: camel-jms-app
+    spec:
+      containers:
+      - name: camel-jms-app
+        image: quay.io/rh-ee-vnachiap/camel-jms-app:1.0
+        imagePullPolicy: Always
+        env:
+        - name: JAVA_OPTS_APPEND
+          value: "-Djava.security.properties=/app/tls/pem/java.security"
+        volumeMounts:
+        - name: trust
+          mountPath: /app/tls/ca
+          readOnly: true
+        - name: cert
+          mountPath: /app/tls/client
+          readOnly: true
+        - name: pem
+          mountPath: /app/tls/pem
+          readOnly: true
+      volumes:
+      - name: trust
+        secret:
+          secretName: arkmq-org-broker-manager-ca
+      - name: cert
+        secret:
+          secretName: messaging-client-cert
+      - name: pem
+        secret:
+          secretName: cert-pemcfg
+      restartPolicy: Always
