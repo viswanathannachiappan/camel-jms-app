@@ -29,13 +29,6 @@
             </dependency>
             <dependency>
                 <groupId>${quarkus.platform.group-id}</groupId>
-                <artifactId>quarkus-qpid-jms-bom</artifactId>
-                <version>${quarkus.platform.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-camel-bom</artifactId>
                 <version>${quarkus.platform.version}</version>
                 <type>pom</type>
@@ -46,12 +39,8 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.amqphub.quarkus</groupId>
-            <artifactId>quarkus-qpid-jms</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.apache.camel.quarkus</groupId>
-            <artifactId>camel-quarkus-jms</artifactId>
+            <artifactId>camel-quarkus-paho-mqtt5</artifactId>
         </dependency>
         <dependency>
             <groupId>org.apache.camel.quarkus</groupId>
