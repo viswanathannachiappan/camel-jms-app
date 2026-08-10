@@ -18,6 +18,8 @@ public class PipelineRoute extends RouteBuilder {
                 .routeId("test-data-generator")
                 .setBody(constant("Auto-generated Test Order"))
                 // Drop it into the start of the pipeline (ORDERS.NEW)
+                // Drop it into the start of the pipeline (ORDERS.SHIPPED)
+                // Drop it into the start of the pipeline (ORDERS.CUSTOMERS)
                 .to("jms:queue:{{consumer.queue}}");
 
         from("jms:queue:{{consumer.queue}}?concurrentConsumers=5")
@@ -37,6 +39,8 @@ public class PipelineRoute extends RouteBuilder {
                 })
                 .log("About to send to {{producer.queue}}: ${body}")
                 // Drop the finished order into the end of the pipeline (ORDERS.PROCESSED)
+                // Drop the finished order into the end of the pipeline (ORDERS.DELIVERED)
+                // Drop the finished order into the end of the pipeline (ORDERS.RETURNS)
                 .to("jms:queue:{{producer.queue}}")
                 .log("Successfully sent to {{producer.queue}}");
     }
