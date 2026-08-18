@@ -6,7 +6,6 @@ import org.apache.camel.builder.RouteBuilder;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.time.Instant;
-import java.util.Optional;
 import java.util.Random;
 import java.util.UUID;
 
@@ -47,7 +46,7 @@ public class OrderPipelineRoute extends RouteBuilder {
     String consumerQueue;
 
     @ConfigProperty(name = "producer.queue", defaultValue = "")
-    Optional<String> producerQueue;
+    String producerQueue;
 
     @ConfigProperty(name = "message.rate", defaultValue = "25")
     int messageRate;
@@ -67,6 +66,8 @@ public class OrderPipelineRoute extends RouteBuilder {
 
     @Override
     public void configure() {
+        validateConfiguration();
+
         String normalizedRole = role.trim().toLowerCase();
 
         switch (normalizedRole) {
@@ -87,7 +88,7 @@ public class OrderPipelineRoute extends RouteBuilder {
 
     private void configureGenerator() {
         String target = resolveProducerQueue("ORDERS.NEW");
-        long periodMs = messageRate > 0 ? (1000L / messageRate) : 1000L;
+        long periodMs = messageRate > 0 ? Math.max(1L, 1000L / messageRate) : 1000L;
 
         from("timer:order-generator?period=" + periodMs + "&delay=2000")
             .routeId("order-generator")
@@ -178,9 +179,29 @@ public class OrderPipelineRoute extends RouteBuilder {
      * property is absent or blank.
      */
     private String resolveProducerQueue(String defaultQueue) {
-        return producerQueue.map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .orElse(defaultQueue);
+        if (producerQueue == null || producerQueue.trim().isEmpty()) {
+            return defaultQueue;
+        }
+        return producerQueue.trim();
+    }
+
+    /**
+     * Validates all numeric configuration properties at startup.
+     * Fails fast with a clear message rather than misbehaving at runtime.
+     */
+    private void validateConfiguration() {
+        if (messageRate < 0) {
+            throw new IllegalArgumentException("MESSAGE_RATE must be >= 0, got: " + messageRate);
+        }
+        if (processingDelayMs < 0) {
+            throw new IllegalArgumentException("PROCESSING_DELAY_MS must be >= 0, got: " + processingDelayMs);
+        }
+        if (errorRate < 0.0 || errorRate > 1.0) {
+            throw new IllegalArgumentException("ERROR_RATE must be between 0.0 and 1.0, got: " + errorRate);
+        }
+        if (consumerConcurrency < 1) {
+            throw new IllegalArgumentException("CONSUMER_CONCURRENCY must be >= 1, got: " + consumerConcurrency);
+        }
     }
 
     /**
@@ -194,7 +215,7 @@ public class OrderPipelineRoute extends RouteBuilder {
 
     /**
      * Randomly throws an exception for ERROR_RATE fraction of messages.
-     * Failed messages land on the DLQ configured for the queue.
+     * JMS/Camel error handling determines how the failed message is handled.
      */
     private void simulateError(Exchange exchange) {
         if (errorRate > 0.0 && RNG.nextDouble() < errorRate) {
