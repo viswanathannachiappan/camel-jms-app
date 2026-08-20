@@ -45,7 +45,7 @@ public class OrderPipelineRoute extends RouteBuilder {
     @ConfigProperty(name = "consumer.queue", defaultValue = "ORDERS.NEW")
     String consumerQueue;
 
-    @ConfigProperty(name = "producer.queue", defaultValue = "")
+    @ConfigProperty(name = "producer.queue", defaultValue = "NONE")
     String producerQueue;
 
     @ConfigProperty(name = "message.rate", defaultValue = "25")
@@ -88,12 +88,19 @@ public class OrderPipelineRoute extends RouteBuilder {
 
     private void configureGenerator() {
         String target = resolveProducerQueue("ORDERS.NEW");
+        // Calculate the interval delay (in milliseconds) between generated messages.
+// - Minimum rate is 1 msg/sec (a rate <= 0 falls back to 1000ms).
+// - Maximum effective rate is 1000 msgs/sec (rates > 1000 are capped to a 1ms delay by Math.max).
         long periodMs = messageRate > 0 ? Math.max(1L, 1000L / messageRate) : 1000L;
 
         from("timer:order-generator?period=" + periodMs + "&delay=2000")
             .routeId("order-generator")
-            .process(exchange -> exchange.getIn().setBody(buildOrderJson()))
-            .log("[generator] → " + target + " | orderId=${body[0..24]}...")
+            .process(exchange -> {
+                String orderId = "ORD-" + shortId();
+                exchange.getIn().setHeader("orderId", orderId);
+                exchange.getIn().setBody(buildOrderJson(orderId));
+            })
+            .log("[generator] → " + target + " | orderId=${header.orderId}")
             .toF("jms:queue:%s", target);
     }
 
@@ -176,10 +183,13 @@ public class OrderPipelineRoute extends RouteBuilder {
 
     /**
      * Returns the configured producer queue, or the supplied default when the
-     * property is absent or blank.
+     * property is absent, blank, or set to the sentinel value "NONE".
+     * Use PRODUCER_QUEUE=NONE for roles that have no output queue (e.g. sink).
      */
     private String resolveProducerQueue(String defaultQueue) {
-        if (producerQueue == null || producerQueue.trim().isEmpty()) {
+        if (producerQueue == null
+                || producerQueue.trim().isEmpty()
+                || producerQueue.trim().equalsIgnoreCase("NONE")) {
             return defaultQueue;
         }
         return producerQueue.trim();
@@ -250,8 +260,7 @@ public class OrderPipelineRoute extends RouteBuilder {
     /**
      * Builds a realistic order JSON string.
      */
-    private String buildOrderJson() {
-        String orderId    = "ORD-" + shortId();
+    private String buildOrderJson(String orderId) {
         String customerId = "CUST-" + (10000 + RNG.nextInt(90000));
         String sku1       = "SKU-" + (10000 + RNG.nextInt(90000));
         String sku2       = "SKU-" + (10000 + RNG.nextInt(90000));
